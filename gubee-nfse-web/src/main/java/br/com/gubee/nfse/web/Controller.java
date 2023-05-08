@@ -27,8 +27,16 @@ import java.time.Duration;
 @RequestMapping("/service1")
 public class Controller {
 
-    RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = new RestTemplate();
 
+    private final CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+            .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
+            .slidingWindowSize(6)
+            .waitDurationInOpenState(Duration.ofMillis(10))
+            .failureRateThreshold(50)
+            .build();
+
+    private CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
 
     @GetMapping
     public void accessAnotherService() throws Exception {
@@ -41,27 +49,20 @@ public class Controller {
     }
 
     private void execute() throws Exception {
-        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
-                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
-                .slidingWindowSize(6)
-                .waitDurationInOpenState(Duration.ofMillis(10))
-                .failureRateThreshold(50)
-                .build();
-
-        CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
-
-        CircuitBreaker circuitBreaker = registry.circuitBreaker("myCircuit");
         try {
-            circuitBreaker.decorateCallable(() -> {
-                final String uri = "http://localhost:8090/service2";
-                RestTemplate restTemplate = new RestTemplate();
-                ResponseEntity<String> result = restTemplate.getForEntity(uri, String.class);
-                System.out.println(result.getBody());
-                return result.getStatusCode();
-            }).call();
+            registry
+                    .circuitBreaker("myCircuit", config)
+                    .decorateCallable(() -> {
+                        final String uri = "http://localhost:8090/service2";
+                        RestTemplate restTemplate = new RestTemplate();
+                        ResponseEntity<String> result = restTemplate.getForEntity(uri, String.class);
+                        System.out.println(result.getBody());
+                        return result.getStatusCode();
+                    }).call();
         } catch (Exception e) {
-            System.out.println("error");
+            System.out.println("Error");
         }
+
     }
 
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/gubee-nfse.iml" filepath="$PROJECT_DIR$/.idea/gubee-nfse.iml" />
+      <module fileurl="file://$PROJECT_DIR$/gubee-nfse-web/gubee-nfse-web.iml" filepath="$PROJECT_DIR$/gubee-nfse-web/gubee-nfse-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/gubee-nfse-web-2/gubee-nfse-web (1).iml" filepath="$PROJECT_DIR$/gubee-nfse-web-2/gubee-nfse-web (1).iml" />
+    </modules>
+  </component>
+</project>
