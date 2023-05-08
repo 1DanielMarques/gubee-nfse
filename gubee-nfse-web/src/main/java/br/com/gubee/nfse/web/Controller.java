@@ -23,6 +23,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
 
+
 @RestController
 @RequestMapping("/service1")
 public class Controller {
@@ -32,17 +33,23 @@ public class Controller {
     private final CircuitBreakerConfig config = CircuitBreakerConfig.custom()
             .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
             .slidingWindowSize(6)
-            .waitDurationInOpenState(Duration.ofMillis(5000))
+            .permittedNumberOfCallsInHalfOpenState(3)
+            .waitDurationInOpenState(Duration.ofMillis(300))
             .failureRateThreshold(50)
             .build();
 
     private CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
+
     private CircuitBreaker circuitBreaker = registry.circuitBreaker("myCircuit", config);
 
     @GetMapping
     public void accessAnotherService() throws Exception {
-        execute();
-        //  Thread.sleep(200);
+        var cont = 0;
+        do {
+            execute();
+            Thread.sleep(200);
+            cont++;
+        } while (cont < 30);
     }
 
     private void execute() throws Exception {
@@ -52,17 +59,12 @@ public class Controller {
                         final String uri = "http://localhost:8090/service2";
                         RestTemplate restTemplate = new RestTemplate();
                         ResponseEntity<String> result = restTemplate.getForEntity(uri, String.class);
-                        System.out.println(result.getBody());
+                        System.out.println(result.getBody() + " " + circuitBreaker.getState());
                         return result.getStatusCode();
                     }).call();
-            circuitBreaker.getEventPublisher()
-                    .onSuccess(event -> System.out.println(event))
-                    .onError(event -> System.out.println(event))
-                    .onIgnoredError(event -> System.out.println(event))
-                    .onReset(event -> System.out.println(event))
-                    .onStateTransition(event -> System.out.println(event));
+            System.out.println();
         } catch (Exception e) {
-            System.out.println("Error");
+            System.out.println("Error" + " " + circuitBreaker.getState());
         }
 
     }
