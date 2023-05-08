@@ -32,26 +32,22 @@ public class Controller {
     private final CircuitBreakerConfig config = CircuitBreakerConfig.custom()
             .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
             .slidingWindowSize(6)
-            .waitDurationInOpenState(Duration.ofMillis(10))
+            .waitDurationInOpenState(Duration.ofMillis(5000))
             .failureRateThreshold(50)
             .build();
 
     private CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
+    private CircuitBreaker circuitBreaker = registry.circuitBreaker("myCircuit", config);
 
     @GetMapping
     public void accessAnotherService() throws Exception {
-        int cont = 0;
-        do {
-            execute();
-            Thread.sleep(200);
-            cont++;
-        } while (cont < 20);
+        execute();
+        //  Thread.sleep(200);
     }
 
     private void execute() throws Exception {
         try {
-            registry
-                    .circuitBreaker("myCircuit", config)
+            circuitBreaker
                     .decorateCallable(() -> {
                         final String uri = "http://localhost:8090/service2";
                         RestTemplate restTemplate = new RestTemplate();
@@ -59,6 +55,12 @@ public class Controller {
                         System.out.println(result.getBody());
                         return result.getStatusCode();
                     }).call();
+            circuitBreaker.getEventPublisher()
+                    .onSuccess(event -> System.out.println(event))
+                    .onError(event -> System.out.println(event))
+                    .onIgnoredError(event -> System.out.println(event))
+                    .onReset(event -> System.out.println(event))
+                    .onStateTransition(event -> System.out.println(event));
         } catch (Exception e) {
             System.out.println("Error");
         }
