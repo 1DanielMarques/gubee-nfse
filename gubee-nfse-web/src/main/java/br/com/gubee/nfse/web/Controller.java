@@ -12,16 +12,16 @@ criar 2 servicos com springboot
 
  */
 
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.decorators.Decorators;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
-import io.vavr.control.Try;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
@@ -44,24 +44,24 @@ public class Controller {
 
     private CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(config);
 
-   private final RetryConfig retryConfig = RetryConfig.custom()
-            .maxAttempts(3)
+    private final RetryConfig retryConfig = RetryConfig.custom()
+            .maxAttempts(2)
             .waitDuration(Duration.ofMillis(1000))
             .failAfterMaxAttempts(true)
             .build();
 
-   private RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
+    private RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
 
 
     @GetMapping
     public void accessAnotherService() throws Exception {
-//        var cont = 0;
-//        do {
-//            execute();
-//            Thread.sleep(200);
-//            cont++;
-//        } while (cont < 30);
-        execute();
+        var cont = 0;
+        do {
+            execute();
+            Thread.sleep(200);
+            cont++;
+        } while (cont < 30);
+//        execute();
     }
 
     private static int cont = 0;
@@ -69,22 +69,16 @@ public class Controller {
     private void execute() {
         var circuitBreaker = circuitBreakerRegistry.circuitBreaker("myCircuit");
         var retry = retryRegistry.retry("myRetry");
-        //Circuit Breaker
-        Supplier<Integer> decoratedSupplier = CircuitBreaker
-                .decorateSupplier(circuitBreaker, () -> retry.executeSupplier(() -> {
-                    var result = sendRequest().getStatusCode().value();
-                    return result;
-                }));
-
-        Try<Integer> result = Try.ofSupplier(decoratedSupplier)
-                .onSuccess(code -> System.out.println("succes " + circuitBreaker.getState()))
-                .onFailure(throwable -> {
-                            if (throwable.getMessage().contains("429")) {
-                                System.out.println("error TOO MANY "+ circuitBreaker.getState());
-                            }
-                        }
-                );
-
+        Supplier<Integer> decoratedSupplier = Decorators.ofSupplier(() -> sendRequest().getStatusCode().value())
+                .withCircuitBreaker(circuitBreaker)
+                .withRetry(retry)
+                .decorate();
+        try {
+            decoratedSupplier.get();
+            System.out.println("Success " + circuitBreaker.getState());
+        } catch (HttpClientErrorException.TooManyRequests e) {
+            System.out.println("TooManyRequests " + circuitBreaker.getState());
+        }
     }
 
 
