@@ -12,7 +12,6 @@ criar 2 servicos com springboot
 
  */
 
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.springframework.http.ResponseEntity;
@@ -34,39 +33,44 @@ public class Controller {
             .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
             .slidingWindowSize(6)
             .permittedNumberOfCallsInHalfOpenState(3)
-            .waitDurationInOpenState(Duration.ofMillis(300))
+            .waitDurationInOpenState(Duration.ofMillis(2000))
             .failureRateThreshold(50)
             .build();
 
     private CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
 
-    private CircuitBreaker circuitBreaker = registry.circuitBreaker("myCircuit", config);
-
     @GetMapping
     public void accessAnotherService() throws Exception {
-        var cont = 0;
-        do {
-            execute();
-            Thread.sleep(200);
-            cont++;
-        } while (cont < 30);
+//        var cont = 0;
+//        do {
+//            execute();
+//            Thread.sleep(200);
+//            cont++;
+//        } while (cont < 30);
+        execute();
     }
 
     private void execute() throws Exception {
+        var circuitBreaker = registry.circuitBreaker("myCircuit");
         try {
             circuitBreaker
                     .decorateCallable(() -> {
-                        final String uri = "http://localhost:8090/service2";
-                        RestTemplate restTemplate = new RestTemplate();
-                        ResponseEntity<String> result = restTemplate.getForEntity(uri, String.class);
-                        System.out.println(result.getBody() + " " + circuitBreaker.getState());
+                        var result = sendRequest();
+                        System.out.print(result.getBody() + " ");
                         return result.getStatusCode();
                     }).call();
-            System.out.println();
         } catch (Exception e) {
-            System.out.println("Error" + " " + circuitBreaker.getState());
+            System.out.print("Error ");
+        } finally {
+            System.out.println(circuitBreaker.getState());
         }
+    }
 
+    private ResponseEntity<String> sendRequest() {
+        final String uri = "http://localhost:8090/service2";
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<String> result = restTemplate.getForEntity(uri, String.class);
+        return result;
     }
 
 

@@ -21,19 +21,19 @@ criar 2 servicos com springboot
 @RequestMapping("/service2")
 public class ThirdPartyController {
 
-    @GetMapping
-    public ResponseEntity<String> operation() {
-        int number = (int) (Math.random() * 10);
-        if (number % 2 == 0) {
-            return ResponseEntity.status(HttpStatus.valueOf(429)).body("Error");
-        } else {
-            return ResponseEntity.status(HttpStatus.valueOf(200)).body("Success");
-        }
-    }
-
 //    @GetMapping
-//    public ResponseEntity<String> operation(){
-//        return ResponseEntity.status(HttpStatus.valueOf(200)).body("Success");
+//    public ResponseEntity<String> operation() {
+//        int number = (int) (Math.random() * 10);
+//        if (number % 2 == 0) {
+//            return ResponseEntity.status(HttpStatus.valueOf(429)).body("Error");
+//        } else {
+//            return ResponseEntity.status(HttpStatus.valueOf(200)).body("Success");
+//        }
 //    }
+
+    @GetMapping
+    public ResponseEntity<String> operation(){
+        return ResponseEntity.status(HttpStatus.valueOf(200)).body("Success");
+    }
 
 }
