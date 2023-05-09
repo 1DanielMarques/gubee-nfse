@@ -12,8 +12,12 @@ criar 2 servicos com springboot
 
  */
 
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
+import io.vavr.control.Try;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
+import java.util.function.Supplier;
 
 
 @RestController
@@ -33,11 +38,20 @@ public class Controller {
             .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
             .slidingWindowSize(6)
             .permittedNumberOfCallsInHalfOpenState(3)
-            .waitDurationInOpenState(Duration.ofMillis(2000))
+            .waitDurationInOpenState(Duration.ofMillis(1000))
             .failureRateThreshold(50)
             .build();
 
-    private CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
+    private CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(config);
+
+   private final RetryConfig retryConfig = RetryConfig.custom()
+            .maxAttempts(3)
+            .waitDuration(Duration.ofMillis(1000))
+            .failAfterMaxAttempts(true)
+            .build();
+
+   private RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
+
 
     @GetMapping
     public void accessAnotherService() throws Exception {
@@ -50,23 +64,32 @@ public class Controller {
         execute();
     }
 
-    private void execute() throws Exception {
-        var circuitBreaker = registry.circuitBreaker("myCircuit");
-        try {
-            circuitBreaker
-                    .decorateCallable(() -> {
-                        var result = sendRequest();
-                        System.out.print(result.getBody() + " ");
-                        return result.getStatusCode();
-                    }).call();
-        } catch (Exception e) {
-            System.out.print("Error ");
-        } finally {
-            System.out.println(circuitBreaker.getState());
-        }
+    private static int cont = 0;
+
+    private void execute() {
+        var circuitBreaker = circuitBreakerRegistry.circuitBreaker("myCircuit");
+        var retry = retryRegistry.retry("myRetry");
+        //Circuit Breaker
+        Supplier<Integer> decoratedSupplier = CircuitBreaker
+                .decorateSupplier(circuitBreaker, () -> retry.executeSupplier(() -> {
+                    var result = sendRequest().getStatusCode().value();
+                    return result;
+                }));
+
+        Try<Integer> result = Try.ofSupplier(decoratedSupplier)
+                .onSuccess(code -> System.out.println("succes " + circuitBreaker.getState()))
+                .onFailure(throwable -> {
+                            if (throwable.getMessage().contains("429")) {
+                                System.out.println("error TOO MANY "+ circuitBreaker.getState());
+                            }
+                        }
+                );
     }
 
+
     private ResponseEntity<String> sendRequest() {
+        cont++;
+        System.out.println(cont);
         final String uri = "http://localhost:8090/service2";
         RestTemplate restTemplate = new RestTemplate();
         ResponseEntity<String> result = restTemplate.getForEntity(uri, String.class);

@@ -36,4 +36,9 @@ public class ThirdPartyController {
         return ResponseEntity.status(HttpStatus.valueOf(200)).body("Success");
     }
 
+//        @GetMapping
+//    public ResponseEntity<String> operation(){
+//        return ResponseEntity.status(HttpStatus.valueOf(429)).body("Too Many requests");
+//    }
+
 }
